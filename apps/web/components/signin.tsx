@@ -1,0 +1,61 @@
+"use client";
+
+import { gasManagerConfig } from "@/lib/config";
+import { useAuthenticate, useSigner, useSignerStatus, useSmartAccountClient, useUser } from "@alchemy/aa-alchemy/react";
+import { User } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+ 
+const SignupLoginComponent = () => {
+  const [email, setEmail] = useState<string>(""); 
+  const [modalOpen, setModalOpen] = useState(false);
+  const { authenticate } = useAuthenticate(); 
+  const { status } = useSignerStatus();
+  const user = useUser();
+
+  return (
+    <>
+      {status !== "CONNECTED" ? (
+        <button
+          className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md"
+          onClick={() => setModalOpen(true)}
+        >
+          Sign In
+        </button>
+      ) : (
+        <div className="flex items-center space-x-2">
+          <User className="h-6 w-6" />
+          <span>{user?.email}</span>
+        </div>
+      )}
+
+      {modalOpen && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg">
+            <h2 className="text-xl mb-4">Sign In</h2>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              className="border p-2 mb-4 w-full"
+            />
+            <button
+              onClick={() => { 
+                authenticate({type: "email", email})
+                setModalOpen(false);
+              }}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md"
+            >
+              Submit
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </> 
+    
+  );
+};
+
+export default SignupLoginComponent;

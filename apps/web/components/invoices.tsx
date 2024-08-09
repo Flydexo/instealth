@@ -2,6 +2,19 @@
 
 import { InvoiceStatus, useInvoiceStore } from "@/lib/stores";
 import { useEffect, useState } from "react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { extractEmbeddedXML } from "@/lib/utils";
+
+const invoiceSchema = z.object({
+    name: z.string(),
+    email: z.string().email(),
+    pdf: z.any().refine((value) => {
+        console.log(value);
+        return value instanceof FileList;
+    }, { message: "Invalid file" }).refine((value: FileList) => value.length > 0, { message: "File is required" }).refine((value: FileList) => value.item(0)?.type === "application/pdf", { message: "Invalid file type" }),
+});
 
 export default function Invoices() {
     const { sentInvoices, receivedInvoices, setSentInvoices, setReceivedInvoices } = useInvoiceStore();
@@ -9,6 +22,15 @@ export default function Invoices() {
     const [activeTab, setActiveTab] = useState('sent');
 
     const displayInvoices = activeTab === 'sent' ? sentInvoices : receivedInvoices;
+
+    const {register, handleSubmit, formState: {errors}} = useForm<z.infer<typeof invoiceSchema>>({
+        resolver: zodResolver(invoiceSchema),
+    });
+
+    const onSubmit = async (data: z.infer<typeof invoiceSchema>) => {
+        const invoice = await extractEmbeddedXML(await data.pdf[0]!.arrayBuffer());
+        console.log(invoice);
+    }
 
     useEffect(() => {
         // Set default invoices for sent and received
@@ -53,12 +75,13 @@ export default function Invoices() {
       
       <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
             {activeTab === 'sent' && (
-              <div className="flex flex-wrap -mx-2">
+              <form className="flex flex-wrap -mx-2" onSubmit={handleSubmit(onSubmit)}>
                 <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
                   <input
                     type="text"
                     placeholder="Name"
                     className="w-full p-2 border rounded"
+                    {...register('name')}
                   />
                 </div>
                 <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
@@ -66,13 +89,7 @@ export default function Invoices() {
                     type="email"
                     placeholder="Recipient Email"
                     className="w-full p-2 border rounded"
-                  />
-                </div>
-                <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    className="w-full p-2 border rounded"
+                    {...register('email')}
                   />
                 </div>
                 <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
@@ -80,19 +97,18 @@ export default function Invoices() {
                     type="file"
                     accept=".pdf"
                     className="w-full p-2 border rounded"
+                    {...register('pdf')}
                   />
                 </div>
                 <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
                   <button
+                    type="submit"
                     className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                    onClick={() => {
-                      // Handle sending invoice logic here
-                    }}
                   >
                     Send
                   </button>
                 </div>
-              </div>
+              </form>
             )}
         <table className="w-full">
           <thead>

@@ -21,7 +21,8 @@
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "viem": "2.8.6"
+    "viem": "2.8.6",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",

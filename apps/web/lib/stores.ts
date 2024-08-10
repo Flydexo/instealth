@@ -16,9 +16,10 @@ export interface Invoice {
     amount: string;
     email: string;
     status: InvoiceStatus;
-    onchainInvoice: OnchainInvoice;
+    onchainInvoice: OnchainInvoice | undefined;
     file: string;
     uid: string;
+    signature: string;
 }
 
 interface InvoiceStore {

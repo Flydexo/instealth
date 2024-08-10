@@ -1,0 +1,21 @@
+{
+  "name": "@repo/emails",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "email dev",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "exports": {
+    "./invoice": "./emails/InvoiceEmail.tsx"
+  },
+  "dependencies": {
+    "@react-email/components": "0.0.22",
+    "react": "^18.2.0",
+    "react-email": "2.1.6"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*"
+  }
+}

@@ -6,12 +6,15 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { base64ToFile, extractEmbeddedXML, fileToBase64, OnchainInvoice } from "@/lib/utils";
-import { useUser, useSmartAccountClient } from "@alchemy/aa-alchemy/react";
-import { encodeAbiParameters, encodeFunctionData, parseEther, zeroAddress } from "viem";
+import { useUser, useSmartAccountClient, useSigner } from "@alchemy/aa-alchemy/react";
+import { domainSeparator, encodeAbiParameters, encodeFunctionData, parseEther, zeroAddress } from "viem";
 import { easAbi } from "@/lib/abis/eas";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
 import { gasManagerConfig } from "@/lib/config";
+import { optimismSepolia } from "viem/chains";
+import * as React from 'react';
+
 
 const invoiceSchema = z.object({
     name: z.string().optional(),
@@ -50,6 +53,7 @@ export default function Invoices() {
     const [modalStatus, setModalStatus] = useState('');
     const [txHash, setTxHash] = useState<[string, string]>(['', '']);
     const [displayInvoices, setDisplayInvoices] = useState<(Omit<Invoice, 'file'> & { file: File })[]>([]);
+    const signer = useSigner();
 
     useEffect(() => {
         getFile(activeTab === 'sent' ? sentInvoices : receivedInvoices).then(setDisplayInvoices);
@@ -63,7 +67,7 @@ export default function Invoices() {
         setIsModalOpen(true);
         setModalStatus('Extracting invoice data...');
         const invoice = await extractEmbeddedXML(await data.pdf[0]!.arrayBuffer());
-        if (!invoice || !client) {
+        if (!invoice || !client || !signer) {
             setModalStatus('Error: Invalid invoice or client not available');
             return;
         }
@@ -122,8 +126,32 @@ export default function Invoices() {
         const logs = await (await fetch(`https://optimism-sepolia.blockscout.com/api/v2/transactions/${hash}/logs`)).json();
         const uid = await getUID(hash);
         if (!uid) return setModalStatus('There was an error with the transaction');
-        setTxHash([hash, uid]);
         setModalStatus('Transaction confirmed!');
+        const signature = await signer.signTypedData({
+            domain: {
+                name: 'EAS',
+                verifyingContract: easAbi.address,
+                chainId: optimismSepolia.id,
+                version: '1.0.2',
+            },
+            primaryType: 'Revoke',
+            message: {
+                schema: '0x2bf052f39c4d907b3032aa7968663d1f49b99a6dd6fb8b23f5519c46567f846b',
+                uid: uid as `0x${string}`,
+                value: 0n,
+                nonce: 1n,
+                deadline: 0n
+            },
+            types: {
+                Revoke: [
+                    { name: 'schema', type: 'bytes32' },
+                    { name: 'uid', type: 'bytes32' },
+                    { name: 'value', type: 'uint256' },
+                    { name: 'nonce', type: 'uint256' },
+                    { name: 'deadline', type: 'uint64' }
+                ]
+            }
+        });
         const newInvoice = {
             date: invoice.date.value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
             name: data.name || invoice.ID,
@@ -133,9 +161,16 @@ export default function Invoices() {
             onchainInvoice: invoice,
             file: await fileToBase64(data.pdf.item(0)!),
             uid,
+            signature
         };
         useInvoiceStore.getState().addSentInvoice(newInvoice);
         reset();
+        await fetch('/api/send', {
+            method: 'POST',
+            body: JSON.stringify({ signature: signature, from: user!.email, invoice: newInvoice, fromAddress: client.account.address }),
+        });
+        setModalStatus('Email sent!');
+        setTxHash([hash, uid]);
     }
 
     return <>

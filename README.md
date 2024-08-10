@@ -5,7 +5,7 @@
 - [x] Submit invoice to EAS
 - [x] Send invoice with resend to customer + link + signature to revoke
 - [x] Pay invoice
-- [ ] Reject invoice
+- [x] Reject invoice
 - [ ] Add classic wallet connect method
 - [ ] Add chain selection (Optimism, Base, Custom, Metal)
 - [x] Add explorer links to blockscout

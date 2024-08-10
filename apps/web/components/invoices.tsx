@@ -5,22 +5,20 @@ import { useEffect, useState } from "react";
 import { set, z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { base64ToFile, EURC, extractEmbeddedXML, fileToBase64, OnchainInvoice } from "@/lib/utils";
+import { base64ToFile, EURC, extractEmbeddedXML, fileToBase64 } from "@/lib/utils";
 import { useUser, useSmartAccountClient, useSigner } from "@alchemy/aa-alchemy/react";
-import { domainSeparator, encodeAbiParameters, encodeFunctionData, erc20Abi, parseEther, zeroAddress } from "viem";
+import { domainSeparator, encodeAbiParameters, encodeFunctionData, erc20Abi, hexToSignature, keccak256, parseEther, toHex, zeroAddress } from "viem";
 import { easAbi } from "@/lib/abis/eas";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
 import { gasManagerConfig } from "@/lib/config";
-import { optimismSepolia } from "viem/chains";
 import * as React from 'react';
-
+import { sendPaymentEmail, sendRejectInvoice } from "@/lib/actions";
 
 const invoiceSchema = z.object({
     name: z.string().optional(),
     email: z.string().email(),
     pdf: z.any().refine((value) => {
-        console.log(value);
         return value instanceof FileList;
     }, { message: "Invalid file" }).refine((value: FileList) => value.length > 0, { message: "File is required" }).refine((value: FileList) => value.item(0)?.type === "application/pdf", { message: "Invalid file type" }),
 });
@@ -32,6 +30,7 @@ export const getFile = async (invoices: Invoice[]): Promise<(Omit<Invoice, 'file
         } as Omit<Invoice, 'file'> & { file: File };
     }));
 }
+
 
 export const getUID = async (hash: string): Promise<string | undefined> => {
     for (let i = 0; i < 10; i++) {
@@ -123,35 +122,9 @@ export default function Invoices() {
         });
         setModalStatus('Waiting for transaction confirmation...');
         const hash = await client.waitForUserOperationTransaction(uo);
-        const logs = await (await fetch(`https://optimism-sepolia.blockscout.com/api/v2/transactions/${hash}/logs`)).json();
         const uid = await getUID(hash);
         if (!uid) return setModalStatus('There was an error with the transaction');
         setModalStatus('Transaction confirmed!');
-        const signature = await signer.signTypedData({
-            domain: {
-                name: 'EAS',
-                verifyingContract: easAbi.address,
-                chainId: optimismSepolia.id,
-                version: '1.0.2',
-            },
-            primaryType: 'Revoke',
-            message: {
-                schema: '0x2bf052f39c4d907b3032aa7968663d1f49b99a6dd6fb8b23f5519c46567f846b',
-                uid: uid as `0x${string}`,
-                value: 0n,
-                nonce: 1n,
-                deadline: 0n
-            },
-            types: {
-                Revoke: [
-                    { name: 'schema', type: 'bytes32' },
-                    { name: 'uid', type: 'bytes32' },
-                    { name: 'value', type: 'uint256' },
-                    { name: 'nonce', type: 'uint256' },
-                    { name: 'deadline', type: 'uint64' }
-                ]
-            }
-        });
         const newInvoice = {
             date: invoice.date.value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
             name: data.name || invoice.ID,
@@ -161,14 +134,13 @@ export default function Invoices() {
             onchainInvoice: invoice,
             file: await fileToBase64(data.pdf.item(0)!),
             uid,
-            signature,
             fromAddress: undefined
         };
         useInvoiceStore.getState().addSentInvoice(newInvoice);
         reset();
         await fetch('/api/send', {
             method: 'POST',
-            body: JSON.stringify({ signature: signature, from: user!.email, invoice: newInvoice, fromAddress: client.account.address }),
+            body: JSON.stringify({ from: user!.email, invoice: newInvoice, fromAddress: client.account.address }),
         });
         setModalStatus('Email sent!');
         setTxHash([hash, uid]);
@@ -267,12 +239,11 @@ export default function Invoices() {
                                 )}
                                 {activeTab === 'received' && (
                                     <td className="border px-4 py-2">
-                                        <button
-                                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded mr-2"
-                                            onClick={() => {
-                                                // Handle reject logic here
-                                            }}
-                                        >
+                                        <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded" onClick={async () => {
+                                            await sendRejectInvoice(invoice.uid, invoice.email, user!.email, invoice.name);
+                                            setIsModalOpen(true);
+                                            setModalStatus(`Email sent to ${invoice.email}`);
+                                        }}>
                                             Reject
                                         </button>
                                         <button
@@ -292,7 +263,9 @@ export default function Invoices() {
                                                     }
                                                 });
                                                 const hash = await client.waitForUserOperationTransaction(uo);
-                                                setModalStatus(`Transaction sent!`);
+                                                setModalStatus(`Sending email!`);
+                                                await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email);
+                                                setModalStatus(`Email sent! to ${invoice.email}`);
                                                 setTxHash([hash, '']);
                                             }}
                                         >

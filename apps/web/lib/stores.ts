@@ -4,7 +4,6 @@ import { OnchainInvoice } from './utils';
 
 export enum InvoiceStatus {
     Sent = 'sent',
-    Received = 'received',
     Rejected = 'rejected',
     Paid = 'paid'
 }
@@ -19,7 +18,6 @@ export interface Invoice {
     onchainInvoice: OnchainInvoice | undefined;
     file: string;
     uid: string;
-    signature: string;
     fromAddress: string | undefined;
 }
 
@@ -30,6 +28,7 @@ interface InvoiceStore {
     setReceivedInvoices: (invoices: Invoice[]) => void;
     addSentInvoice: (invoice: Invoice) => void;
     addReceivedInvoice: (invoice: Invoice) => void;
+    setInvoiceStatus: (uid: string, status: InvoiceStatus) => void;
 }
 export const useInvoiceStore = create<InvoiceStore>()(
     persist(
@@ -40,6 +39,18 @@ export const useInvoiceStore = create<InvoiceStore>()(
             setReceivedInvoices: (invoices) => set({ receivedInvoices: invoices }),
             addSentInvoice: (invoice) => set((state) => ({ sentInvoices: [...state.sentInvoices, invoice] })),
             addReceivedInvoice: (invoice) => set((state) => ({ receivedInvoices: [...state.receivedInvoices, invoice] })),
+            setInvoiceStatus: (uid, status) => set((state) => ({
+                receivedInvoices: state.receivedInvoices.map(invoice => {
+                    if (invoice.uid === uid) {
+                        return { ...invoice, status }
+                    } else { return invoice }
+                }),
+                sentInvoices: state.sentInvoices.map(invoice => {
+                    if (invoice.uid === uid) {
+                        return { ...invoice, status }
+                    } else { return invoice }
+                })
+            })),
         }),
         {
             name: 'invoice-storage',

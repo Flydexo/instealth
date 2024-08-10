@@ -8,7 +8,9 @@
     "check-types": "tsc --noEmit"
   },
   "exports": {
-    "./invoice": "./emails/InvoiceEmail.tsx"
+    "./invoice": "./emails/InvoiceEmail.tsx",
+    "./reject": "./emails/RejectEmail.tsx",
+    "./payment": "./emails/PaymentEmail.tsx"
   },
   "dependencies": {
     "@react-email/components": "0.0.22",

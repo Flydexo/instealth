@@ -16,7 +16,6 @@ export default function InvoicePage() {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.hash.slice(2));
         const paramsObject = Object.fromEntries(urlParams.entries());
-        console.log(paramsObject)
         setParams(paramsObject);
         if (paramsObject.file) {
             base64ToFile(paramsObject.file, paramsObject.name as string).then(file => { console.log(file); setFile(file) });
@@ -31,10 +30,9 @@ export default function InvoicePage() {
                 <p>date:{params.date}</p>
                 <p>amount:{params.amount}</p>
                 <p>status:{params.status}</p>
-                <p>email:{params.email}</p>
+                <p>email:{decodeURIComponent(params.from)}</p>
                 <p>name:{params.name}</p>
                 <p>uid:{params.uid}</p>
-                <p>signature:{params.signature}</p>
                 <p>file: <a href={URL.createObjectURL(file)} download={file.name} className="text-blue-500 hover:text-blue-800">View PDF</a></p>
                 <button
                     className="bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800"
@@ -43,11 +41,10 @@ export default function InvoicePage() {
                             date: params.date,
                             name: params.name,
                             amount: params.amount,
-                            email: params.email,
+                            email: decodeURIComponent(params.from),
                             status: params.status as InvoiceStatus,
                             file: params.file,
                             uid: params.uid,
-                            signature: params.signature,
                             onchainInvoice: undefined,
                             fromAddress: params.fromAddress,
                         });

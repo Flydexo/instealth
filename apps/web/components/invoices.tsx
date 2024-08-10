@@ -35,7 +35,7 @@ export const getFile = async (invoices: Invoice[]): Promise<(Omit<Invoice, 'file
 export const getUID = async (hash: string): Promise<string | undefined> => {
     for (let i = 0; i < 10; i++) {
         try {
-            const logs = await (await fetch(`https://optimism-sepolia.blockscout.com/api/v2/transactions/${hash}/logs`)).json();
+            const logs = await (await fetch(`https://base-sepolia.blockscout.com/api/v2/transactions/${hash}/logs`)).json();
             return logs.items.find((item: any) => item.decoded.method_call === "Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID)").decoded.parameters[2].value;
         } catch (e) {
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -240,7 +240,7 @@ export default function Invoices() {
                                 {activeTab === 'received' && (
                                     <td className="border px-4 py-2">
                                         <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded" onClick={async () => {
-                                            await sendRejectInvoice(invoice.uid, invoice.email, user!.email, invoice.name);
+                                            await sendRejectInvoice(invoice.uid, invoice.email, user!.email as string, invoice.name);
                                             setIsModalOpen(true);
                                             setModalStatus(`Email sent to ${invoice.email}`);
                                         }}>
@@ -264,7 +264,7 @@ export default function Invoices() {
                                                 });
                                                 const hash = await client.waitForUserOperationTransaction(uo);
                                                 setModalStatus(`Sending email!`);
-                                                await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email);
+                                                await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email as string);
                                                 setModalStatus(`Email sent! to ${invoice.email}`);
                                                 setTxHash([hash, '']);
                                             }}
@@ -287,10 +287,10 @@ export default function Invoices() {
                                 {modalStatus}
                             </p>
                             {txHash[0] && (
-                                <a href={`https://optimism-sepolia.blockscout.com/tx/${txHash[0]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See transaction</a>
+                                <a href={`https://base-sepolia.blockscout.com/tx/${txHash[0]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See transaction</a>
                             )}
                             {txHash[1] && txHash[1].length > 0 && (
-                                <a href={`https://optimism-sepolia.easscan.org/attestation/view/${txHash[1]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See attestation</a>
+                                <a href={`https://base-sepolia.easscan.org/attestation/view/${txHash[1]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See attestation</a>
                             )}
                         </div>
                         {txHash && (

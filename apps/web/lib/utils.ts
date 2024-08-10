@@ -6,7 +6,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const EURC = '0x5DA87d377dA16d940Ed992146397A454c625C410';
+// export const EURC = '0x5DA87d377dA16d940Ed992146397A454c625C410';
+export const EURC = '0x997Da581b99516d6fC98ECd3e71cF83aEbeefeB9';
 
 export interface OnchainInvoice {
   ID: string;
@@ -174,11 +175,11 @@ export async function base64ToFile(base64: string, fileName: string): Promise<Fi
 }
 
 import { http, createConfig } from 'wagmi'
-import { optimismSepolia } from 'wagmi/chains'
+import { baseSepolia, optimismSepolia } from 'wagmi/chains'
 
 export const wagmiConfig = createConfig({
-  chains: [optimismSepolia],
+  chains: [baseSepolia],
   transports: {
-    [optimismSepolia.id]: http(),
+    [baseSepolia.id]: http(),
   },
 })

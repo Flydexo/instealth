@@ -7,7 +7,7 @@
 - [x] Pay invoice
 - [x] Reject invoice
 - [ ] Add classic wallet connect method
-- [ ] Add chain selection (Optimism, Base, Custom, Metal)
+- [ ] Add chain selection (Optimism, Base, Custom, metal L2)
 - [x] Add explorer links to blockscout
 
 IF TIME:

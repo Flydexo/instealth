@@ -1,8 +1,10 @@
 "use server";
 
-import { resend } from "@/app/api/send/route";
 import { RejectEmail } from "@repo/emails/reject";
 import { PaymentEmail } from "@repo/emails/payment";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendRejectInvoice = async (uid: string, to: string, from: string, name: string) => {
     return await resend.emails.send({

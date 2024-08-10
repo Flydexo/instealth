@@ -1,8 +1,8 @@
 import { AlchemyGasManagerConfig } from "@alchemy/aa-alchemy";
 import { cookieStorage, createConfig } from "@alchemy/aa-alchemy/config";
-import { optimismSepolia } from "viem/chains";
+import { baseSepolia, optimismSepolia } from "viem/chains";
 
-export const chain = optimismSepolia;
+export const chain = baseSepolia;
 export const config = createConfig({
   rpcUrl: "/api/rpc/chain/" + chain.id,
   signerConnection: {
@@ -14,5 +14,5 @@ export const config = createConfig({
 });
 
 export const gasManagerConfig: AlchemyGasManagerConfig = {
-    policyId: process.env.NEXT_PUBLIC_ALCHEMY_GAS_MANAGER_POLICY_ID!,
+  policyId: process.env.NEXT_PUBLIC_ALCHEMY_GAS_MANAGER_POLICY_ID!,
 };

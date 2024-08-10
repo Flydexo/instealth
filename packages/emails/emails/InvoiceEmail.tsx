@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Tailwind, Button, Html, Heading, Body, Container } from "@react-email/components";
 
 export enum InvoiceStatus {
@@ -44,17 +43,17 @@ export const InvoiceEmail: React.FC<Readonly<EmailTemplateProps>> = ({
     </Html>
 );
 
-InvoiceEmail.PreviewProps = {
-    invoice: {
-        email: "test@test.com",
-        date: "2021-01-01",
-        amount: 100,
-        status: "pending",
-        name: "Test User",
-        uid: "123",
-        file: "test.pdf"
-    },
-    fromAddress: "0x0000000000000000000000000000000000000000"
-};
+// InvoiceEmail.PreviewProps = {
+//     invoice: {
+//         email: "test@test.com",
+//         date: "2021-01-01",
+//         amount: 100,
+//         status: "pending",
+//         name: "Test User",
+//         uid: "123",
+//         file: "test.pdf"
+//     },
+//     fromAddress: "0x0000000000000000000000000000000000000000"
+// };
 
 export default InvoiceEmail;

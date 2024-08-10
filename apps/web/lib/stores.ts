@@ -20,6 +20,7 @@ export interface Invoice {
     file: string;
     uid: string;
     signature: string;
+    fromAddress: string | undefined;
 }
 
 interface InvoiceStore {

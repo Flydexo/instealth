@@ -2,12 +2,12 @@
 
 import { Invoice, InvoiceStatus, useInvoiceStore } from "@/lib/stores";
 import { useEffect, useState } from "react";
-import { z } from "zod";
+import { set, z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { base64ToFile, extractEmbeddedXML, fileToBase64, OnchainInvoice } from "@/lib/utils";
+import { base64ToFile, EURC, extractEmbeddedXML, fileToBase64, OnchainInvoice } from "@/lib/utils";
 import { useUser, useSmartAccountClient, useSigner } from "@alchemy/aa-alchemy/react";
-import { domainSeparator, encodeAbiParameters, encodeFunctionData, parseEther, zeroAddress } from "viem";
+import { domainSeparator, encodeAbiParameters, encodeFunctionData, erc20Abi, parseEther, zeroAddress } from "viem";
 import { easAbi } from "@/lib/abis/eas";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
@@ -161,7 +161,8 @@ export default function Invoices() {
             onchainInvoice: invoice,
             file: await fileToBase64(data.pdf.item(0)!),
             uid,
-            signature
+            signature,
+            fromAddress: undefined
         };
         useInvoiceStore.getState().addSentInvoice(newInvoice);
         reset();
@@ -276,8 +277,23 @@ export default function Invoices() {
                                         </button>
                                         <button
                                             className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded"
-                                            onClick={() => {
-                                                // Handle pay logic here
+                                            onClick={async () => {
+                                                if (!client) return;
+                                                setIsModalOpen(true);
+                                                setModalStatus(`Sending ${invoice.amount}€ to ${invoice.email}`);
+                                                const uo = await client.sendUserOperation({
+                                                    uo: {
+                                                        target: EURC,
+                                                        data: encodeFunctionData({
+                                                            abi: erc20Abi,
+                                                            functionName: 'transfer',
+                                                            args: [invoice.fromAddress! as `0x${string}`, parseEther(invoice.amount)]
+                                                        })
+                                                    }
+                                                });
+                                                const hash = await client.waitForUserOperationTransaction(uo);
+                                                setModalStatus(`Transaction sent!`);
+                                                setTxHash([hash, '']);
                                             }}
                                         >
                                             Pay
@@ -300,7 +316,7 @@ export default function Invoices() {
                             {txHash[0] && (
                                 <a href={`https://optimism-sepolia.blockscout.com/tx/${txHash[0]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See transaction</a>
                             )}
-                            {txHash[1] && (
+                            {txHash[1] && txHash[1].length > 0 && (
                                 <a href={`https://optimism-sepolia.easscan.org/attestation/view/${txHash[1]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See attestation</a>
                             )}
                         </div>

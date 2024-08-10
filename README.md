@@ -3,10 +3,12 @@
 - [x] Create interface for onchain invoice data
 - [x] Remove name & email from form, get from PDF
 - [x] Submit invoice to EAS
-- [ ] Send invoice with resend to customer + link + signature to revoke
+- [x] Send invoice with resend to customer + link + signature to revoke
+- [x] Pay invoice
+- [ ] Reject invoice
 - [ ] Add classic wallet connect method
 - [ ] Add chain selection (Optimism, Base, Custom, Metal)
-- [ ] Add explorer links to blockscout
+- [x] Add explorer links to blockscout
 
 IF TIME:
 - [ ] Add passkeys for metal L2

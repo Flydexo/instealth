@@ -48,7 +48,8 @@ export default function InvoicePage() {
                             file: params.file,
                             uid: params.uid,
                             signature: params.signature,
-                            onchainInvoice: undefined
+                            onchainInvoice: undefined,
+                            fromAddress: params.fromAddress,
                         });
                         router.push('/');
                     }}

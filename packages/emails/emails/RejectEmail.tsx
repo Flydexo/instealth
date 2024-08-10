@@ -17,7 +17,7 @@ export const RejectEmail: React.FC<Readonly<EmailTemplateProps>> = ({
             <Body className='bg-white my-auto mx-auto font-sans px-2'>
                 <Container className="border border-solid border-[#eaeaea] rounded my-[40px] mx-auto p-[20px] max-w-[465px] flex flex-col items-center justify-center">
                     <Heading className='text-black text-[24px] font-normal text-center p-0 my-[30px] mx-0' as="h2">{from} rejected your invoice {name}</Heading>
-                    <Button className="bg-[#000000] rounded text-white text-[12px] font-semibold no-underline text-center px-5 py-3" href={`http://localhost:3000/reject#?uid=${uid}`}>Update invoice</Button>
+                    <Button className="bg-[#000000] rounded text-white text-[12px] font-semibold no-underline text-center px-5 py-3" href={`https://instealth.vercel.app/reject#?uid=${uid}`}>Update invoice</Button>
                 </Container>
             </Body>
         </Tailwind>

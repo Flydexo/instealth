@@ -146,8 +146,8 @@ export default function Invoices() {
         setTxHash([hash, uid]);
     }
 
-    return <>
-        {user && <main className="container mx-auto mt-8 px-4">
+    return <div>
+        {<main className="container mx-auto mt-8 px-4">
             <div className="mb-4">
                 <ul className="flex border-b">
                     <li className="mr-1">
@@ -312,5 +312,5 @@ export default function Invoices() {
                 </div>
             </div>, document.body)}
         </main >}
-    </>
+    </div>
 }

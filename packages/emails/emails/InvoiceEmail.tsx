@@ -34,7 +34,7 @@ export const InvoiceEmail: React.FC<Readonly<EmailTemplateProps>> = ({
             <Body className='bg-white my-auto mx-auto font-sans px-2'>
                 <Container className="border border-solid border-[#eaeaea] rounded my-[40px] mx-auto p-[20px] max-w-[465px] flex flex-col items-center justify-center">
                     <Heading className='text-black text-[24px] font-normal text-center p-0 my-[30px] mx-0' as="h2">New invoice from {from}</Heading>
-                    <Button className="bg-[#000000] rounded text-white text-[12px] font-semibold no-underline text-center px-5 py-3" href={`http://localhost:3000/invoice#?fromAddress=${encodeURIComponent(fromAddress)}&from=${encodeURIComponent(from)}&date=${invoice.date}&amount=${invoice.amount}&status=${invoice.status}&email=${invoice.email}&name=${invoice.name}&uid=${invoice.uid}&file=${encodeURIComponent(invoice.file)}`}>Add invoice</Button>
+                    <Button className="bg-[#000000] rounded text-white text-[12px] font-semibold no-underline text-center px-5 py-3" href={`https://instealth.vercel.app/invoice#?fromAddress=${encodeURIComponent(fromAddress)}&from=${encodeURIComponent(from)}&date=${invoice.date}&amount=${invoice.amount}&status=${invoice.status}&email=${invoice.email}&name=${invoice.name}&uid=${invoice.uid}&file=${encodeURIComponent(invoice.file)}`}>Add invoice</Button>
                 </Container>
             </Body>
         </Tailwind>

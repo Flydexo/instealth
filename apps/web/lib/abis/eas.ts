@@ -2,7 +2,13 @@ export const easAbi = {
     "address": "0x4200000000000000000000000000000000000021",
     "abi": [
         {
-            "inputs": [],
+            "inputs": [
+                {
+                    "internalType": "contract ISchemaRegistry",
+                    "name": "registry",
+                    "type": "address"
+                }
+            ],
             "stateMutability": "nonpayable",
             "type": "constructor"
         },
@@ -24,6 +30,11 @@ export const easAbi = {
         {
             "inputs": [],
             "name": "AlreadyTimestamped",
+            "type": "error"
+        },
+        {
+            "inputs": [],
+            "name": "DeadlineExpired",
             "type": "error"
         },
         {
@@ -53,6 +64,11 @@ export const easAbi = {
         },
         {
             "inputs": [],
+            "name": "InvalidNonce",
+            "type": "error"
+        },
+        {
+            "inputs": [],
             "name": "InvalidOffset",
             "type": "error"
         },
@@ -78,6 +94,11 @@ export const easAbi = {
         },
         {
             "inputs": [],
+            "name": "InvalidShortString",
+            "type": "error"
+        },
+        {
+            "inputs": [],
             "name": "InvalidSignature",
             "type": "error"
         },
@@ -99,6 +120,17 @@ export const easAbi = {
         {
             "inputs": [],
             "name": "NotPayable",
+            "type": "error"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "string",
+                    "name": "str",
+                    "type": "string"
+                }
+            ],
+            "name": "StringTooLong",
             "type": "error"
         },
         {
@@ -130,11 +162,36 @@ export const easAbi = {
                 {
                     "indexed": true,
                     "internalType": "bytes32",
-                    "name": "schema",
+                    "name": "schemaUID",
                     "type": "bytes32"
                 }
             ],
             "name": "Attested",
+            "type": "event"
+        },
+        {
+            "anonymous": false,
+            "inputs": [],
+            "name": "EIP712DomainChanged",
+            "type": "event"
+        },
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "oldNonce",
+                    "type": "uint256"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "newNonce",
+                    "type": "uint256"
+                }
+            ],
+            "name": "NonceIncreased",
             "type": "event"
         },
         {
@@ -161,7 +218,7 @@ export const easAbi = {
                 {
                     "indexed": true,
                     "internalType": "bytes32",
-                    "name": "schema",
+                    "name": "schemaUID",
                     "type": "bytes32"
                 }
             ],
@@ -339,7 +396,7 @@ export const easAbi = {
                                     "type": "bytes32"
                                 }
                             ],
-                            "internalType": "struct EIP712Signature",
+                            "internalType": "struct Signature",
                             "name": "signature",
                             "type": "tuple"
                         },
@@ -347,6 +404,11 @@ export const easAbi = {
                             "internalType": "address",
                             "name": "attester",
                             "type": "address"
+                        },
+                        {
+                            "internalType": "uint64",
+                            "name": "deadline",
+                            "type": "uint64"
                         }
                     ],
                     "internalType": "struct DelegatedAttestationRequest",
@@ -363,6 +425,49 @@ export const easAbi = {
                 }
             ],
             "stateMutability": "payable",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "eip712Domain",
+            "outputs": [
+                {
+                    "internalType": "bytes1",
+                    "name": "fields",
+                    "type": "bytes1"
+                },
+                {
+                    "internalType": "string",
+                    "name": "name",
+                    "type": "string"
+                },
+                {
+                    "internalType": "string",
+                    "name": "version",
+                    "type": "string"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "chainId",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "address",
+                    "name": "verifyingContract",
+                    "type": "address"
+                },
+                {
+                    "internalType": "bytes32",
+                    "name": "salt",
+                    "type": "bytes32"
+                },
+                {
+                    "internalType": "uint256[]",
+                    "name": "extensions",
+                    "type": "uint256[]"
+                }
+            ],
+            "stateMutability": "view",
             "type": "function"
         },
         {
@@ -541,7 +646,7 @@ export const easAbi = {
                     "type": "address"
                 }
             ],
-            "stateMutability": "pure",
+            "stateMutability": "view",
             "type": "function"
         },
         {
@@ -561,6 +666,19 @@ export const easAbi = {
                 }
             ],
             "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "newNonce",
+                    "type": "uint256"
+                }
+            ],
+            "name": "increaseNonce",
+            "outputs": [],
+            "stateMutability": "nonpayable",
             "type": "function"
         },
         {
@@ -709,7 +827,7 @@ export const easAbi = {
                                     "type": "bytes32"
                                 }
                             ],
-                            "internalType": "struct EIP712Signature[]",
+                            "internalType": "struct Signature[]",
                             "name": "signatures",
                             "type": "tuple[]"
                         },
@@ -717,6 +835,11 @@ export const easAbi = {
                             "internalType": "address",
                             "name": "attester",
                             "type": "address"
+                        },
+                        {
+                            "internalType": "uint64",
+                            "name": "deadline",
+                            "type": "uint64"
                         }
                     ],
                     "internalType": "struct MultiDelegatedAttestationRequest[]",
@@ -816,7 +939,7 @@ export const easAbi = {
                                     "type": "bytes32"
                                 }
                             ],
-                            "internalType": "struct EIP712Signature[]",
+                            "internalType": "struct Signature[]",
                             "name": "signatures",
                             "type": "tuple[]"
                         },
@@ -824,6 +947,11 @@ export const easAbi = {
                             "internalType": "address",
                             "name": "revoker",
                             "type": "address"
+                        },
+                        {
+                            "internalType": "uint64",
+                            "name": "deadline",
+                            "type": "uint64"
                         }
                     ],
                     "internalType": "struct MultiDelegatedRevocationRequest[]",
@@ -955,7 +1083,7 @@ export const easAbi = {
                                     "type": "bytes32"
                                 }
                             ],
-                            "internalType": "struct EIP712Signature",
+                            "internalType": "struct Signature",
                             "name": "signature",
                             "type": "tuple"
                         },
@@ -963,6 +1091,11 @@ export const easAbi = {
                             "internalType": "address",
                             "name": "revoker",
                             "type": "address"
+                        },
+                        {
+                            "internalType": "uint64",
+                            "name": "deadline",
+                            "type": "uint64"
                         }
                     ],
                     "internalType": "struct DelegatedRevocationRequest",

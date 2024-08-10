@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 
 const fontSans = FontSans({ subsets: ["latin"], variable: "--font-sans" });
 
-export default function RootLayout({
+const RootLayout: React.FC = ({
   children,
-}: any) {
+}: any) => {
   const initialState = cookieToInitialState(
     config,
     headers().get("cookie") ?? undefined,
@@ -30,3 +30,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+export default RootLayout;

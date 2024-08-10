@@ -1,16 +1,17 @@
 "use client";
 
-import { InvoiceStatus, useInvoiceStore } from "@/lib/stores";
+import { Invoice, InvoiceStatus, useInvoiceStore } from "@/lib/stores";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { extractEmbeddedXML } from "@/lib/utils";
+import { base64ToFile, extractEmbeddedXML, fileToBase64, OnchainInvoice } from "@/lib/utils";
 import { useUser, useSmartAccountClient } from "@alchemy/aa-alchemy/react";
 import { encodeAbiParameters, encodeFunctionData, parseEther, zeroAddress } from "viem";
 import { easAbi } from "@/lib/abis/eas";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
+import { gasManagerConfig } from "@/lib/config";
 
 const invoiceSchema = z.object({
     name: z.string().optional(),
@@ -20,17 +21,39 @@ const invoiceSchema = z.object({
         return value instanceof FileList;
     }, { message: "Invalid file" }).refine((value: FileList) => value.length > 0, { message: "File is required" }).refine((value: FileList) => value.item(0)?.type === "application/pdf", { message: "Invalid file type" }),
 });
+export const getFile = async (invoices: Invoice[]): Promise<(Omit<Invoice, 'file'> & { file: File })[]> => {
+    return Promise.all(invoices.map(async (invoice) => {
+        return {
+            ...invoice,
+            file: await base64ToFile(invoice.file, `${invoice.name}.pdf`)
+        } as Omit<Invoice, 'file'> & { file: File };
+    }));
+}
+
+export const getUID = async (hash: string): Promise<string | undefined> => {
+    for (let i = 0; i < 10; i++) {
+        try {
+            const logs = await (await fetch(`https://optimism-sepolia.blockscout.com/api/v2/transactions/${hash}/logs`)).json();
+            return logs.items.find((item: any) => item.decoded.method_call === "Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID)").decoded.parameters[2].value;
+        } catch (e) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+}
 
 export default function Invoices() {
     const { sentInvoices, receivedInvoices, setSentInvoices, setReceivedInvoices } = useInvoiceStore();
     const user = useUser();
-    const { client } = useSmartAccountClient({ type: 'LightAccount' });
+    const { client } = useSmartAccountClient({ type: 'LightAccount', gasManagerConfig });
     const [activeTab, setActiveTab] = useState('sent');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalStatus, setModalStatus] = useState('');
-    const [txHash, setTxHash] = useState('');
+    const [txHash, setTxHash] = useState<[string, string]>(['', '']);
+    const [displayInvoices, setDisplayInvoices] = useState<(Omit<Invoice, 'file'> & { file: File })[]>([]);
 
-    const displayInvoices = activeTab === 'sent' ? sentInvoices : receivedInvoices;
+    useEffect(() => {
+        getFile(activeTab === 'sent' ? sentInvoices : receivedInvoices).then(setDisplayInvoices);
+    }, [activeTab, sentInvoices, receivedInvoices]);
 
     const { register, handleSubmit, setValue, reset } = useForm<z.infer<typeof invoiceSchema>>({
         resolver: zodResolver(invoiceSchema),
@@ -48,17 +71,6 @@ export default function Invoices() {
             setValue('name', invoice.ID);
         }
         setModalStatus('Creating new invoice...');
-        const newInvoice = {
-            date: invoice.date.value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
-            name: data.name || invoice.ID,
-            amount: invoice.tradeSettlement.duePayableAmount!,
-            email: data.email,
-            status: InvoiceStatus.Sent,
-            onchainInvoice: invoice,
-            file: data.pdf.item(0)!,
-        };
-        useInvoiceStore.getState().addSentInvoice(newInvoice);
-        reset();
         setModalStatus('Preparing invoice data for blockchain...');
         const onchainInvoiceLeafs: string[][] = [
             ["ID", invoice.ID],
@@ -96,7 +108,7 @@ export default function Invoices() {
                                 recipient: zeroAddress,
                                 expirationTime: 0n,
                                 revocable: true,
-                                refUID: '0x0',
+                                refUID: '0x0000000000000000000000000000000000000000000000000000000000000000',
                                 data: encodeAbiParameters([{ type: 'bytes32' }], [tree.root as `0x${string}`]),
                                 value: 0n
                             }
@@ -107,8 +119,23 @@ export default function Invoices() {
         });
         setModalStatus('Waiting for transaction confirmation...');
         const hash = await client.waitForUserOperationTransaction(uo);
-        setTxHash(hash);
+        const logs = await (await fetch(`https://optimism-sepolia.blockscout.com/api/v2/transactions/${hash}/logs`)).json();
+        const uid = await getUID(hash);
+        if (!uid) return setModalStatus('There was an error with the transaction');
+        setTxHash([hash, uid]);
         setModalStatus('Transaction confirmed!');
+        const newInvoice = {
+            date: invoice.date.value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+            name: data.name || invoice.ID,
+            amount: invoice.tradeSettlement.duePayableAmount!,
+            email: data.email,
+            status: InvoiceStatus.Sent,
+            onchainInvoice: invoice,
+            file: await fileToBase64(data.pdf.item(0)!),
+            uid,
+        };
+        useInvoiceStore.getState().addSentInvoice(newInvoice);
+        reset();
     }
 
     return <>
@@ -231,14 +258,15 @@ export default function Invoices() {
                 <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                     <div className="mt-3 text-center">
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Transaction Status</h3>
-                        <div className="mt-2 px-7 py-3">
+                        <div className="mt-2 px-7 py-3 flex flex-col gap-2">
                             <p className="text-sm text-gray-500">
                                 {modalStatus}
                             </p>
-                            {txHash && (
-                                <p className="mt-2 text-sm text-gray-500">
-                                    Transaction Hash: {txHash}
-                                </p>
+                            {txHash[0] && (
+                                <a href={`https://optimism-sepolia.blockscout.com/tx/${txHash[0]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See transaction</a>
+                            )}
+                            {txHash[1] && (
+                                <a href={`https://optimism-sepolia.easscan.org/attestation/view/${txHash[1]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See attestation</a>
                             )}
                         </div>
                         {txHash && (
@@ -249,7 +277,7 @@ export default function Invoices() {
                                     onClick={() => {
                                         setIsModalOpen(false);
                                         setModalStatus('');
-                                        setTxHash('');
+                                        setTxHash(['', '']);
                                     }}
                                 >
                                     Close

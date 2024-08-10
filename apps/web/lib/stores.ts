@@ -10,14 +10,15 @@ export enum InvoiceStatus {
 }
 
 
-interface Invoice {
+export interface Invoice {
     date: string;
     name: string;
     amount: string;
     email: string;
     status: InvoiceStatus;
     onchainInvoice: OnchainInvoice;
-    file: File;
+    file: string;
+    uid: string;
 }
 
 interface InvoiceStore {

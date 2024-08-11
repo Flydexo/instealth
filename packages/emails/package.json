@@ -10,7 +10,8 @@
   "exports": {
     "./invoice": "./emails/InvoiceEmail.tsx",
     "./reject": "./emails/RejectEmail.tsx",
-    "./payment": "./emails/PaymentEmail.tsx"
+    "./payment": "./emails/PaymentEmail.tsx",
+    "./proof": "./emails/ProofEmail.tsx"
   },
   "dependencies": {
     "@react-email/components": "0.0.22",

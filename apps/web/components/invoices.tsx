@@ -13,9 +13,8 @@ import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
 import { gasManagerConfig } from "@/lib/config";
 import * as React from 'react';
-import { sendPaymentEmail, sendRejectInvoice } from "@/lib/actions";
-import Link from "next/link";
-import { generateKeysFromSignature, generateStealthAddress, generateStealthMetaAddressFromKeys, generateStealthMetaAddressFromSignature } from "@scopelift/stealth-address-sdk";
+import { sendPaymentEmail, sendProofEmail, sendRejectInvoice } from "@/lib/actions";
+import { generateKeysFromSignature, generateStealthAddress, generateStealthMetaAddressFromKeys } from "@scopelift/stealth-address-sdk";
 import { stealthAbi } from "@/lib/abis/stealth";
 
 const invoiceSchema = z.object({
@@ -225,9 +224,7 @@ export default function Invoices() {
                             {activeTab === 'sent' && (
                                 <th className="px-4 py-2">Status</th>
                             )}
-                            {activeTab === 'received' && (
-                                <th className="px-4 py-2">Actions</th>
-                            )}
+                            <th className="px-4 py-2">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -243,55 +240,93 @@ export default function Invoices() {
                                 {activeTab === 'sent' && (
                                     <td className="border px-4 py-2">{invoice.status} {invoice.status === InvoiceStatus.Paid && <a href={`https://base-sepolia.blockscout.com/address/${invoice.fromAddress}`} target="_blank" className="text-blue-500 hover:text-blue-800">View receipt</a>}</td>
                                 )}
-                                {activeTab === 'received' && (
-                                    <td className="border px-4 py-2">
-                                        <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded" onClick={async () => {
-                                            await sendRejectInvoice(invoice.uid, invoice.email, user!.email as string, invoice.name);
-                                            setIsModalOpen(true);
-                                            setModalStatus(`Email sent to ${invoice.email}`);
-                                        }}>
-                                            Reject
-                                        </button>
-                                        <button
-                                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded"
-                                            onClick={async () => {
-                                                if (!client) return;
+                                <td className="border px-4 py-2">
+                                    {activeTab === 'received' && (
+                                        <>
+                                            <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded" onClick={async () => {
+                                                await sendRejectInvoice(invoice.uid, invoice.email, user!.email as string, invoice.name);
                                                 setIsModalOpen(true);
-                                                setModalStatus(`Sending ${invoice.amount}€ to ${invoice.email}`);
-                                                const { stealthAddress, ephemeralPublicKey, viewTag } = generateStealthAddress({ stealthMetaAddressURI: invoice.fromAddress! })
-                                                const uo = await client.sendUserOperation({
-                                                    uo: {
-                                                        target: EURC,
-                                                        data: encodeFunctionData({
-                                                            abi: erc20Abi,
-                                                            functionName: 'transfer',
-                                                            args: [stealthAddress, parseEther(invoice.amount)]
-                                                        })
-                                                    }
-                                                });
-                                                const hash = await client.waitForUserOperationTransaction(uo);
-                                                setModalStatus(`Announcing payment to ${invoice.email}`);
-                                                const announceUO = await client.sendUserOperation({
-                                                    uo: {
-                                                        target: stealthAbi.address,
-                                                        data: encodeFunctionData({
-                                                            abi: stealthAbi.abi,
-                                                            functionName: 'announce',
-                                                            args: [1n, stealthAddress, ephemeralPublicKey, `${viewTag}${toFunctionSelector('function transfer(address,uint256) returns (bool)').slice(2)}${EURC.slice(2)}${toHex(parseEther(invoice.amount)).slice(2)}`]
-                                                        })
-                                                    }
-                                                });
-                                                await client.waitForUserOperationTransaction(announceUO);
-                                                setModalStatus(`Sending email!`);
-                                                await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email as string, stealthAddress);
-                                                setModalStatus(`Email sent! to ${invoice.email}`);
-                                                setTxHash([hash, '']);
-                                            }}
-                                        >
-                                            Pay
-                                        </button>
-                                    </td>
-                                )}
+                                                setModalStatus(`Email sent to ${invoice.email}`);
+                                            }}>
+                                                Reject
+                                            </button>
+                                            <button
+                                                className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded"
+                                                onClick={async () => {
+                                                    if (!client) return;
+                                                    setIsModalOpen(true);
+                                                    setModalStatus(`Sending ${invoice.amount}€ to ${invoice.email}`);
+                                                    const { stealthAddress, ephemeralPublicKey, viewTag } = generateStealthAddress({ stealthMetaAddressURI: invoice.fromAddress! })
+                                                    const uo = await client.sendUserOperation({
+                                                        uo: {
+                                                            target: EURC,
+                                                            data: encodeFunctionData({
+                                                                abi: erc20Abi,
+                                                                functionName: 'transfer',
+                                                                args: [stealthAddress, parseEther(invoice.amount)]
+                                                            })
+                                                        }
+                                                    });
+                                                    const hash = await client.waitForUserOperationTransaction(uo);
+                                                    setModalStatus(`Announcing payment to ${invoice.email}`);
+                                                    const announceUO = await client.sendUserOperation({
+                                                        uo: {
+                                                            target: stealthAbi.address,
+                                                            data: encodeFunctionData({
+                                                                abi: stealthAbi.abi,
+                                                                functionName: 'announce',
+                                                                args: [1n, stealthAddress, ephemeralPublicKey, `${viewTag}${toFunctionSelector('function transfer(address,uint256) returns (bool)').slice(2)}${EURC.slice(2)}${toHex(parseEther(invoice.amount)).slice(2)}`]
+                                                            })
+                                                        }
+                                                    });
+                                                    await client.waitForUserOperationTransaction(announceUO);
+                                                    setModalStatus(`Sending email!`);
+                                                    await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email as string, stealthAddress);
+                                                    setModalStatus(`Email sent! to ${invoice.email}`);
+                                                    setTxHash([hash, '']);
+                                                }}
+                                            >
+                                                Pay
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
+                                        onClick={async () => {
+                                            const onchainInvoice = await extractEmbeddedXML(await invoice.file.arrayBuffer());
+                                            if (!onchainInvoice) return;
+                                            useInvoiceStore.getState().updateInvoice(invoice.uid, { onchainInvoice });
+                                            const onchainInvoiceLeafs: string[][] = [
+                                                ["ID", onchainInvoice.ID],
+                                                ["date.value", onchainInvoice.date.value],
+                                                ["date.format", onchainInvoice.date.format],
+                                                ["typeCode", onchainInvoice.typeCode],
+                                                ["issuerAssignedID", onchainInvoice.issuerAssignedID],
+                                                ["buyerTradeParty.name", onchainInvoice.buyerTradeParty.name],
+                                                ["buyerTradeParty.specifiedLegalOrganizationID.value", onchainInvoice.buyerTradeParty.specifiedLegalOrganizationID.value],
+                                                ["buyerTradeParty.specifiedLegalOrganizationID.schemeID", onchainInvoice.buyerTradeParty.specifiedLegalOrganizationID.schemeID],
+                                                ["sellerTradeParty.name", onchainInvoice.sellerTradeParty.name],
+                                                ["sellerTradeParty.postalTradeAddress.countryID", onchainInvoice.sellerTradeParty.postalTradeAddress.countryID],
+                                                ["sellerTradeParty.specifiedLegalOrganizationID.value", onchainInvoice.sellerTradeParty.specifiedLegalOrganizationID.value],
+                                                ["sellerTradeParty.specifiedLegalOrganizationID.schemeID", onchainInvoice.sellerTradeParty.specifiedLegalOrganizationID.schemeID],
+                                                ["sellerTradeParty.specifiedTaxRegistrationID.value", onchainInvoice.sellerTradeParty.specifiedTaxRegistrationID.value],
+                                                ["sellerTradeParty.specifiedTaxRegistrationID.schemeID", onchainInvoice.sellerTradeParty.specifiedTaxRegistrationID.schemeID],
+                                                ["tradeSettlement.invoiceCurrencyCode", onchainInvoice.tradeSettlement.invoiceCurrencyCode],
+                                                ["tradeSettlement.duePayableAmount", onchainInvoice.tradeSettlement.duePayableAmount],
+                                                ["tradeSettlement.taxBasisTotalAmount", onchainInvoice.tradeSettlement.taxBasisTotalAmount],
+                                                ["tradeSettlement.taxTotalAmount.value", onchainInvoice.tradeSettlement.taxTotalAmount.value],
+                                                ["tradeSettlement.taxTotalAmount.currencyID", onchainInvoice.tradeSettlement.taxTotalAmount.currencyID]
+                                            ];
+                                            const tree = StandardMerkleTree.of(onchainInvoiceLeafs, ["string", "string"]);
+                                            const proof = tree.getProof(["tradeSettlement.taxTotalAmount.value", onchainInvoice.tradeSettlement.taxTotalAmount.value]);
+                                            await sendProofEmail(user!.email as string, proof, invoice.uid, onchainInvoice.tradeSettlement.taxTotalAmount.value);
+                                            setIsModalOpen(true);
+                                            setModalStatus("The tax proof has been sent to you via email");
+                                        }}
+                                    >
+                                        Prove taxes
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>

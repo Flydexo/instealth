@@ -2,6 +2,7 @@
 
 import { RejectEmail } from "@repo/emails/reject";
 import { PaymentEmail } from "@repo/emails/payment";
+import { ProofEmail } from "@repo/emails/proof";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -21,5 +22,14 @@ export const sendPaymentEmail = async (email: string, amount: number, uid: strin
         to: [email],
         subject: `Payment received for invoice: ${name}`,
         react: PaymentEmail({ amount, uid, name, from, env: process.env.NODE_ENV, stealth }),
+    });
+}
+
+export const sendProofEmail = async (email: string, proof: string[], uid: string, taxAmount: string) => {
+    return await resend.emails.send({
+        from: 'Instealth <instealth@nebulearn.xyz>',
+        to: [email],
+        subject: `Tax proof for invoice: ${uid}`,
+        react: ProofEmail({ proof, uid, env: process.env.NODE_ENV, taxAmount }),
     });
 }

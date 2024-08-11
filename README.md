@@ -8,7 +8,7 @@
 - [x] Reject invoice
 - [x] Add explorer links to blockscout
 - [x] Add stealth addresses
-- [ ] Add tax proving
+- [x] Add tax proving
 
 TIMELINE:
 - POC finished 10/08 00h

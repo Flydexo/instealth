@@ -10,7 +10,7 @@ export async function POST(req: Request) {
             from: 'Instealth <instealth@nebulearn.xyz>',
             to: [body.invoice.email],
             subject: `New invoice from ${body.from}`,
-            react: InvoiceEmail({ fromAddress: body.fromAddress, invoice: body.invoice, from: body.from }),
+            react: InvoiceEmail({ fromAddress: body.fromAddress, invoice: body.invoice, from: body.from, env: process.env.NODE_ENV }),
         });
 
         if (error) {

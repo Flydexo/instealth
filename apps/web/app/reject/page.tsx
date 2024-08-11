@@ -13,7 +13,7 @@ export default function RejectPage() {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.hash.slice(2));
         const paramsObject = Object.fromEntries(urlParams.entries());
-        useInvoiceStore.getState().setInvoiceStatus(paramsObject.uid as string, InvoiceStatus.Rejected);
+        useInvoiceStore.getState().updateInvoice(paramsObject.uid as string, { status: InvoiceStatus.Rejected });
         router.push('/');
     }, []);
 

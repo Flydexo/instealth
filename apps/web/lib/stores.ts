@@ -28,7 +28,7 @@ interface InvoiceStore {
     setReceivedInvoices: (invoices: Invoice[]) => void;
     addSentInvoice: (invoice: Invoice) => void;
     addReceivedInvoice: (invoice: Invoice) => void;
-    setInvoiceStatus: (uid: string, status: InvoiceStatus) => void;
+    updateInvoice: (uid: string, updatedInvoice: Partial<Invoice>) => void;
 }
 export const useInvoiceStore = create<InvoiceStore>()(
     persist(
@@ -39,15 +39,15 @@ export const useInvoiceStore = create<InvoiceStore>()(
             setReceivedInvoices: (invoices) => set({ receivedInvoices: invoices }),
             addSentInvoice: (invoice) => set((state) => ({ sentInvoices: [...state.sentInvoices, invoice] })),
             addReceivedInvoice: (invoice) => set((state) => ({ receivedInvoices: [...state.receivedInvoices, invoice] })),
-            setInvoiceStatus: (uid, status) => set((state) => ({
+            updateInvoice: (uid, updatedInvoice: Partial<Invoice>) => set((state) => ({
                 receivedInvoices: state.receivedInvoices.map(invoice => {
                     if (invoice.uid === uid) {
-                        return { ...invoice, status }
+                        return { ...invoice, ...updatedInvoice }
                     } else { return invoice }
                 }),
                 sentInvoices: state.sentInvoices.map(invoice => {
                     if (invoice.uid === uid) {
-                        return { ...invoice, status }
+                        return { ...invoice, ...updatedInvoice }
                     } else { return invoice }
                 })
             })),

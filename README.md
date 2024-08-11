@@ -6,12 +6,9 @@
 - [x] Send invoice with resend to customer + link + signature to revoke
 - [x] Pay invoice
 - [x] Reject invoice
-- [ ] Add classic wallet connect method
-- [ ] Add chain selection (Optimism, Base, Custom, metal L2)
 - [x] Add explorer links to blockscout
-
-IF TIME:
-- [ ] Add passkeys for metal L2
+- [x] Add stealth addresses
+- [ ] Add tax proving
 
 TIMELINE:
 - POC finished 10/08 00h

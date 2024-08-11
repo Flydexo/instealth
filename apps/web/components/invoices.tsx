@@ -6,14 +6,17 @@ import { set, z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { base64ToFile, EURC, extractEmbeddedXML, fileToBase64 } from "@/lib/utils";
-import { useUser, useSmartAccountClient, useSigner } from "@alchemy/aa-alchemy/react";
-import { domainSeparator, encodeAbiParameters, encodeFunctionData, erc20Abi, hexToSignature, keccak256, parseEther, toHex, zeroAddress } from "viem";
+import { useUser, useSmartAccountClient, useSigner, useExportAccount } from "@alchemy/aa-alchemy/react";
+import { domainSeparator, encodeAbiParameters, encodeFunctionData, erc20Abi, hexToSignature, keccak256, parseEther, toFunctionSelector, toHex, zeroAddress } from "viem";
 import { easAbi } from "@/lib/abis/eas";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
 import { gasManagerConfig } from "@/lib/config";
 import * as React from 'react';
 import { sendPaymentEmail, sendRejectInvoice } from "@/lib/actions";
+import Link from "next/link";
+import { generateKeysFromSignature, generateStealthAddress, generateStealthMetaAddressFromKeys, generateStealthMetaAddressFromSignature } from "@scopelift/stealth-address-sdk";
+import { stealthAbi } from "@/lib/abis/stealth";
 
 const invoiceSchema = z.object({
     name: z.string().optional(),
@@ -138,16 +141,19 @@ export default function Invoices() {
         };
         useInvoiceStore.getState().addSentInvoice(newInvoice);
         reset();
+        const keys = generateKeysFromSignature(await signer!.signMessage(`Generate stealth address for chain base sepolia on instealth`));
+        const stealthMeta = `st:basesep:${generateStealthMetaAddressFromKeys(keys)}`;
+
         await fetch('/api/send', {
             method: 'POST',
-            body: JSON.stringify({ from: user!.email, invoice: newInvoice, fromAddress: client.account.address }),
+            body: JSON.stringify({ from: user!.email, invoice: newInvoice, fromAddress: stealthMeta }),
         });
         setModalStatus('Email sent!');
         setTxHash([hash, uid]);
     }
 
     return <div>
-        {<main className="container mx-auto mt-8 px-4">
+        {user && <main className="container mx-auto mt-8 px-4">
             <div className="mb-4">
                 <ul className="flex border-b">
                     <li className="mr-1">
@@ -235,7 +241,7 @@ export default function Invoices() {
                                     <a href={URL.createObjectURL(invoice.file)} download={invoice.file.name} className="text-blue-500 hover:text-blue-800">View PDF</a>
                                 </td>
                                 {activeTab === 'sent' && (
-                                    <td className="border px-4 py-2">{invoice.status}</td>
+                                    <td className="border px-4 py-2">{invoice.status} {invoice.status === InvoiceStatus.Paid && <a href={`https://base-sepolia.blockscout.com/address/${invoice.fromAddress}`} target="_blank" className="text-blue-500 hover:text-blue-800">View receipt</a>}</td>
                                 )}
                                 {activeTab === 'received' && (
                                     <td className="border px-4 py-2">
@@ -252,19 +258,32 @@ export default function Invoices() {
                                                 if (!client) return;
                                                 setIsModalOpen(true);
                                                 setModalStatus(`Sending ${invoice.amount}€ to ${invoice.email}`);
+                                                const { stealthAddress, ephemeralPublicKey, viewTag } = generateStealthAddress({ stealthMetaAddressURI: invoice.fromAddress! })
                                                 const uo = await client.sendUserOperation({
                                                     uo: {
                                                         target: EURC,
                                                         data: encodeFunctionData({
                                                             abi: erc20Abi,
                                                             functionName: 'transfer',
-                                                            args: [invoice.fromAddress! as `0x${string}`, parseEther(invoice.amount)]
+                                                            args: [stealthAddress, parseEther(invoice.amount)]
                                                         })
                                                     }
                                                 });
                                                 const hash = await client.waitForUserOperationTransaction(uo);
+                                                setModalStatus(`Announcing payment to ${invoice.email}`);
+                                                const announceUO = await client.sendUserOperation({
+                                                    uo: {
+                                                        target: stealthAbi.address,
+                                                        data: encodeFunctionData({
+                                                            abi: stealthAbi.abi,
+                                                            functionName: 'announce',
+                                                            args: [1n, stealthAddress, ephemeralPublicKey, `${viewTag}${toFunctionSelector('function transfer(address,uint256) returns (bool)').slice(2)}${EURC.slice(2)}${toHex(parseEther(invoice.amount)).slice(2)}`]
+                                                        })
+                                                    }
+                                                });
+                                                await client.waitForUserOperationTransaction(announceUO);
                                                 setModalStatus(`Sending email!`);
-                                                await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email as string);
+                                                await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email as string, stealthAddress);
                                                 setModalStatus(`Email sent! to ${invoice.email}`);
                                                 setTxHash([hash, '']);
                                             }}
@@ -278,39 +297,40 @@ export default function Invoices() {
                     </tbody>
                 </table>
             </div>
-            {isModalOpen && createPortal(<div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-                <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                    <div className="mt-3 text-center">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Transaction Status</h3>
-                        <div className="mt-2 px-7 py-3 flex flex-col gap-2">
-                            <p className="text-sm text-gray-500">
-                                {modalStatus}
-                            </p>
-                            {txHash[0] && (
-                                <a href={`https://base-sepolia.blockscout.com/tx/${txHash[0]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See transaction</a>
-                            )}
-                            {txHash[1] && txHash[1].length > 0 && (
-                                <a href={`https://base-sepolia.easscan.org/attestation/view/${txHash[1]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See attestation</a>
-                            )}
-                        </div>
-                        {txHash && (
-                            <div className="items-center px-4 py-3">
-                                <button
-                                    id="ok-btn"
-                                    className="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                                    onClick={() => {
-                                        setIsModalOpen(false);
-                                        setModalStatus('');
-                                        setTxHash(['', '']);
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            </div>
+
+        </main >}
+        {isModalOpen && createPortal(<div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div className="mt-3 text-center">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Transaction Status</h3>
+                    <div className="mt-2 px-7 py-3 flex flex-col gap-2">
+                        <p className="text-sm text-gray-500">
+                            {modalStatus}
+                        </p>
+                        {txHash[0] && (
+                            <a href={`https://base-sepolia.blockscout.com/tx/${txHash[0]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See transaction</a>
+                        )}
+                        {txHash[1] && txHash[1].length > 0 && (
+                            <a href={`https://base-sepolia.easscan.org/attestation/view/${txHash[1]}`} target="_blank" className="text-blue-500 hover:text-blue-800">See attestation</a>
                         )}
                     </div>
+                    {txHash && (
+                        <div className="items-center px-4 py-3">
+                            <button
+                                id="ok-btn"
+                                className="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                onClick={() => {
+                                    setIsModalOpen(false);
+                                    setModalStatus('');
+                                    setTxHash(['', '']);
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    )}
                 </div>
-            </div>, document.body)}
-        </main >}
+            </div>
+        </div>, document.body)}
     </div>
 }

@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 export default function InvoicePage() {
     const [params, setParams] = useState<any>();
     const [file, setFile] = useState<File>();
-    const { sentInvoices, receivedInvoices, setSentInvoices, setReceivedInvoices } = useInvoiceStore();
     const router = useRouter();
 
 

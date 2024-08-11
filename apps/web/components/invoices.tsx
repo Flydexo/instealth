@@ -145,7 +145,7 @@ export default function Invoices() {
             email: data.email,
             status: InvoiceStatus.Sent,
             onchainInvoice: invoice,
-            file: "",
+            file: await fileToBase64(data.pdf.item(0)!),
             uid,
             fromAddress: undefined
         };

@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 import { headers } from "next/headers";
 import { cookieToInitialState } from "@alchemy/aa-alchemy/config";
 import { Providers } from "./providers";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "Instealth",
@@ -26,6 +27,7 @@ const RootLayout: React.FC = ({
     <html lang="en">
       <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
         <Providers initialState={initialState}>{children}</Providers>
+        <Toaster />
       </body>
     </html>
   );

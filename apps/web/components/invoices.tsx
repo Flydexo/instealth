@@ -16,6 +16,14 @@ import * as React from 'react';
 import { sendPaymentEmail, sendProofEmail, sendRejectInvoice } from "@/lib/actions";
 import { generateKeysFromSignature, generateStealthAddress, generateStealthMetaAddressFromKeys } from "@scopelift/stealth-address-sdk";
 import { stealthAbi } from "@/lib/abis/stealth";
+import { Button } from "./ui/button";
+import { Loader2, Mail } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { DataTable } from "./data-table";
+import { receivedColumns, sentColumns } from "./columns";
+import { Input } from "./ui/input";
+import { toast } from "./ui/use-toast";
+import Link from "next/link";
 
 const invoiceSchema = z.object({
     name: z.string().optional(),
@@ -48,35 +56,34 @@ export const getUID = async (hash: string): Promise<string | undefined> => {
 export default function Invoices() {
     const { sentInvoices, receivedInvoices, setSentInvoices, setReceivedInvoices } = useInvoiceStore();
     const user = useUser();
+    const [isLoading, setIsLoading] = useState(false);
     const { client } = useSmartAccountClient({ type: 'LightAccount', gasManagerConfig });
-    const [activeTab, setActiveTab] = useState('sent');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalStatus, setModalStatus] = useState('');
-    const [txHash, setTxHash] = useState<[string, string]>(['', '']);
-    const [displayInvoices, setDisplayInvoices] = useState<(Omit<Invoice, 'file'> & { file: File })[]>([]);
     const signer = useSigner();
+    const [displayedSentInvoices, setDisplayedSentInvoices] = useState<(Omit<Invoice, 'file'> & { file: File })[]>([]);
+    const [displayedReceivedInvoices, setDisplayedReceivedInvoices] = useState<(Omit<Invoice, 'file'> & { file: File })[]>([]);
 
     useEffect(() => {
-        getFile(activeTab === 'sent' ? sentInvoices : receivedInvoices).then(setDisplayInvoices);
-    }, [activeTab, sentInvoices, receivedInvoices]);
+        getFile(sentInvoices).then(setDisplayedSentInvoices);
+        getFile(receivedInvoices).then(setDisplayedReceivedInvoices);
+    }, [sentInvoices, receivedInvoices]);
 
     const { register, handleSubmit, setValue, reset } = useForm<z.infer<typeof invoiceSchema>>({
         resolver: zodResolver(invoiceSchema),
     });
 
     const onSubmit = async (data: z.infer<typeof invoiceSchema>) => {
-        setIsModalOpen(true);
-        setModalStatus('Extracting invoice data...');
+        setIsLoading(true);
+        toast({ title: "Extracting invoice data", description: "Extracting invoice data..." });
         const invoice = await extractEmbeddedXML(await data.pdf[0]!.arrayBuffer());
         if (!invoice || !client || !signer) {
-            setModalStatus('Error: Invalid invoice or client not available');
+            toast({ title: "Error", description: "Invalid invoice or client not available" });
+            setIsLoading(false);
             return;
         }
         if (!data.name) {
             setValue('name', invoice.ID);
         }
-        setModalStatus('Creating new invoice...');
-        setModalStatus('Preparing invoice data for blockchain...');
+        toast({ title: "Creating new invoice", description: "Preparing invoice data for blockchain..." });
         const onchainInvoiceLeafs: string[][] = [
             ["ID", invoice.ID],
             ["date.value", invoice.date.value],
@@ -99,7 +106,7 @@ export default function Invoices() {
             ["tradeSettlement.taxTotalAmount.currencyID", invoice.tradeSettlement.taxTotalAmount.currencyID]
         ];
         const tree = StandardMerkleTree.of(onchainInvoiceLeafs, ["string", "string"]);
-        setModalStatus('Sending transaction...');
+        toast({ title: "Sending transaction", description: "Sending transaction..." });
         const uo = await client.sendUserOperation({
             uo: {
                 target: easAbi.address,
@@ -122,11 +129,15 @@ export default function Invoices() {
                 })
             }
         });
-        setModalStatus('Waiting for transaction confirmation...');
+        toast({ title: "Waiting for transaction confirmation", description: "Waiting for transaction confirmation..." });
         const hash = await client.waitForUserOperationTransaction(uo);
         const uid = await getUID(hash);
-        if (!uid) return setModalStatus('There was an error with the transaction');
-        setModalStatus('Transaction confirmed!');
+        if (!uid) {
+            toast({ title: "Transaction confirmed", description: "There was an error with the transaction" });
+            setIsLoading(false);
+            return;
+        }
+        toast({ title: "Transaction confirmed", description: <Link href={`https://base-sepolia.blockscout.com/tx/${hash}`} target="_blank" className="text-blue-500 hover:text-blue-800">View receipt</Link> });
         const newInvoice = {
             date: invoice.date.value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
             name: data.name || invoice.ID,
@@ -147,194 +158,69 @@ export default function Invoices() {
             method: 'POST',
             body: JSON.stringify({ from: user!.email, invoice: newInvoice, fromAddress: stealthMeta }),
         });
-        setModalStatus('Email sent!');
-        setTxHash([hash, uid]);
+        toast({ title: "Email sent", description: "Email sent!" });
+        toast({ title: "Invoice created", description: <Link href={`https://base-sepolia.easscan.org/attestation/view/${uid}`} target="_blank" className="text-blue-500 hover:text-blue-800">View attestation</Link> });
+        setIsLoading(false);
     }
 
-    return <div>
-        {user && <main className="container mx-auto mt-8 px-4">
-            <div className="mb-4">
-                <ul className="flex border-b">
-                    <li className="mr-1">
-                        <a
-                            className={`bg-white inline-block py-2 px-4 font-semibold ${activeTab === 'sent' ? 'text-blue-800' : 'text-blue-500 hover:text-blue-800'}`}
-                            href="#"
-                            onClick={() => setActiveTab('sent')}
-                        >
-                            Sent Invoices
-                        </a>
-                    </li>
-                    <li className="mr-1">
-                        <a
-                            className={`bg-white inline-block py-2 px-4 font-semibold ${activeTab === 'received' ? 'text-blue-800' : 'text-blue-500 hover:text-blue-800'}`}
-                            href="#"
-                            onClick={() => setActiveTab('received')}
-                        >
-                            Received Invoices
-                        </a>
-                    </li>
-                </ul>
-            </div>
+    return <div className="h-full px-16 py-16">
+        {user &&
+            <>
 
-            <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-                {activeTab === 'sent' && (
-                    <form className="flex flex-wrap -mx-2" onSubmit={handleSubmit(onSubmit)}>
-                        <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
-                            <input
-                                type="text"
-                                placeholder="Name"
-                                className="w-full p-2 border rounded"
-                                {...register('name')}
-                            />
-                        </div>
-                        <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
-                            <input
-                                type="email"
-                                placeholder="Recipient Email"
-                                className="w-full p-2 border rounded"
-                                {...register('email')}
-                            />
-                        </div>
-                        <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
-                            <input
-                                type="file"
-                                accept=".pdf"
-                                className="w-full p-2 border rounded"
-                                {...register('pdf')}
-                            />
-                        </div>
-                        <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
-                            <button
-                                type="submit"
-                                className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                            >
-                                Send
-                            </button>
-                        </div>
-                    </form>
-                )}
-                <table className="w-full">
-                    <thead>
-                        <tr>
-                            <th className="px-4 py-2">Date</th>
-                            <th className="px-4 py-2">Name</th>
-                            <th className="px-4 py-2">Amount</th>
-                            <th className="px-4 py-2">Email</th>
-                            <th className="px-4 py-2">PDF</th>
-                            {activeTab === 'sent' && (
-                                <th className="px-4 py-2">Status</th>
-                            )}
-                            <th className="px-4 py-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {displayInvoices.map((invoice, index) => (
-                            <tr key={index}>
-                                <td className="border px-4 py-2">{invoice.date}</td>
-                                <td className="border px-4 py-2">{invoice.name}</td>
-                                <td className="border px-4 py-2">{invoice.amount}</td>
-                                <td className="border px-4 py-2">{invoice.email}</td>
-                                <td className="border px-4 py-2">
-                                    <a href={URL.createObjectURL(invoice.file)} download={invoice.file.name} className="text-blue-500 hover:text-blue-800">View PDF</a>
-                                </td>
-                                {activeTab === 'sent' && (
-                                    <td className="border px-4 py-2">{invoice.status} {invoice.status === InvoiceStatus.Paid && <a href={`https://base-sepolia.blockscout.com/address/${invoice.fromAddress}`} target="_blank" className="text-blue-500 hover:text-blue-800">View receipt</a>}</td>
-                                )}
-                                <td className="border px-4 py-2">
-                                    {activeTab === 'received' && (
-                                        <>
-                                            <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded" onClick={async () => {
-                                                await sendRejectInvoice(invoice.uid, invoice.email, user!.email as string, invoice.name);
-                                                setIsModalOpen(true);
-                                                setModalStatus(`Email sent to ${invoice.email}`);
-                                            }}>
-                                                Reject
-                                            </button>
-                                            <button
-                                                className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded"
-                                                onClick={async () => {
-                                                    if (!client) return;
-                                                    setIsModalOpen(true);
-                                                    setModalStatus(`Sending ${invoice.amount}€ to ${invoice.email}`);
-                                                    const { stealthAddress, ephemeralPublicKey, viewTag } = generateStealthAddress({ stealthMetaAddressURI: invoice.fromAddress! })
-                                                    const uo = await client.sendUserOperation({
-                                                        uo: {
-                                                            target: EURC,
-                                                            data: encodeFunctionData({
-                                                                abi: erc20Abi,
-                                                                functionName: 'transfer',
-                                                                args: [stealthAddress, parseEther(invoice.amount)]
-                                                            })
-                                                        }
-                                                    });
-                                                    const hash = await client.waitForUserOperationTransaction(uo);
-                                                    setModalStatus(`Announcing payment to ${invoice.email}`);
-                                                    const announceUO = await client.sendUserOperation({
-                                                        uo: {
-                                                            target: stealthAbi.address,
-                                                            data: encodeFunctionData({
-                                                                abi: stealthAbi.abi,
-                                                                functionName: 'announce',
-                                                                args: [1n, stealthAddress, ephemeralPublicKey, `${viewTag}${toFunctionSelector('function transfer(address,uint256) returns (bool)').slice(2)}${EURC.slice(2)}${toHex(parseEther(invoice.amount)).slice(2)}`]
-                                                            })
-                                                        }
-                                                    });
-                                                    await client.waitForUserOperationTransaction(announceUO);
-                                                    setModalStatus(`Sending email!`);
-                                                    await sendPaymentEmail(invoice.email, Number(invoice.amount), invoice.uid, invoice.name, user!.email as string, stealthAddress);
-                                                    setModalStatus(`Email sent! to ${invoice.email}`);
-                                                    setTxHash([hash, '']);
-                                                }}
-                                            >
-                                                Pay
-                                            </button>
-                                        </>
-                                    )}
-                                    <button
-                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
-                                        onClick={async () => {
-                                            const onchainInvoice = await extractEmbeddedXML(await invoice.file.arrayBuffer());
-                                            if (!onchainInvoice) return;
-                                            useInvoiceStore.getState().updateInvoice(invoice.uid, { onchainInvoice });
-                                            const onchainInvoiceLeafs: string[][] = [
-                                                ["ID", onchainInvoice.ID],
-                                                ["date.value", onchainInvoice.date.value],
-                                                ["date.format", onchainInvoice.date.format],
-                                                ["typeCode", onchainInvoice.typeCode],
-                                                ["issuerAssignedID", onchainInvoice.issuerAssignedID],
-                                                ["buyerTradeParty.name", onchainInvoice.buyerTradeParty.name],
-                                                ["buyerTradeParty.specifiedLegalOrganizationID.value", onchainInvoice.buyerTradeParty.specifiedLegalOrganizationID.value],
-                                                ["buyerTradeParty.specifiedLegalOrganizationID.schemeID", onchainInvoice.buyerTradeParty.specifiedLegalOrganizationID.schemeID],
-                                                ["sellerTradeParty.name", onchainInvoice.sellerTradeParty.name],
-                                                ["sellerTradeParty.postalTradeAddress.countryID", onchainInvoice.sellerTradeParty.postalTradeAddress.countryID],
-                                                ["sellerTradeParty.specifiedLegalOrganizationID.value", onchainInvoice.sellerTradeParty.specifiedLegalOrganizationID.value],
-                                                ["sellerTradeParty.specifiedLegalOrganizationID.schemeID", onchainInvoice.sellerTradeParty.specifiedLegalOrganizationID.schemeID],
-                                                ["sellerTradeParty.specifiedTaxRegistrationID.value", onchainInvoice.sellerTradeParty.specifiedTaxRegistrationID.value],
-                                                ["sellerTradeParty.specifiedTaxRegistrationID.schemeID", onchainInvoice.sellerTradeParty.specifiedTaxRegistrationID.schemeID],
-                                                ["tradeSettlement.invoiceCurrencyCode", onchainInvoice.tradeSettlement.invoiceCurrencyCode],
-                                                ["tradeSettlement.duePayableAmount", onchainInvoice.tradeSettlement.duePayableAmount],
-                                                ["tradeSettlement.taxBasisTotalAmount", onchainInvoice.tradeSettlement.taxBasisTotalAmount],
-                                                ["tradeSettlement.taxTotalAmount.value", onchainInvoice.tradeSettlement.taxTotalAmount.value],
-                                                ["tradeSettlement.taxTotalAmount.currencyID", onchainInvoice.tradeSettlement.taxTotalAmount.currencyID]
-                                            ];
-                                            const tree = StandardMerkleTree.of(onchainInvoiceLeafs, ["string", "string"]);
-                                            const proof = tree.getProof(["tradeSettlement.taxTotalAmount.value", onchainInvoice.tradeSettlement.taxTotalAmount.value]);
-                                            await sendProofEmail(user!.email as string, proof, invoice.uid, onchainInvoice.tradeSettlement.taxTotalAmount.value);
-                                            setIsModalOpen(true);
-                                            setModalStatus("The tax proof has been sent to you via email");
-                                        }}
-                                    >
-                                        Prove taxes
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                <form className="flex flex-wrap -mx-2" onSubmit={handleSubmit(onSubmit)}>
+                    <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
+                        <Input
+                            type="text"
+                            placeholder="Name"
+                            className="w-full p-2 border rounded"
+                            {...register('name')}
+                        />
+                    </div>
+                    <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
+                        <Input
+                            type="email"
+                            placeholder="Recipient Email"
+                            className="w-full p-2 border rounded"
+                            {...register('email')}
+                        />
+                    </div>
+                    <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
+                        <Input
+                            type="file"
+                            accept=".pdf"
+                            className="w-full p-2 border rounded"
+                            {...register('pdf')}
+                        />
+                    </div>
+                    <div className="w-full sm:w-1/2 md:w-1/5 px-2 mb-4">
+                        <Button
+                            disabled={isLoading}
+                            type="submit"
+                        > {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Send
+                        </Button>
+                    </div>
+                </form>
+                <Tabs defaultValue="sent" className="w-full">
+                    <TabsList>
+                        <TabsTrigger value="sent">Sent Invoices</TabsTrigger>
+                        <TabsTrigger value="received">Received Invoices</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="sent">
 
-        </main >}
-        {isModalOpen && createPortal(<div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+                        <DataTable columns={sentColumns} data={displayedSentInvoices} />
+                    </TabsContent>
+                    <TabsContent value="received">
+                        <DataTable columns={receivedColumns} data={displayedReceivedInvoices} />
+                    </TabsContent>
+                </Tabs>
+            </>
+        }
+        {!user && <div className="w-full h-full flex flex-col justify-center items-center gap-16">
+            <h1 className="text-8xl font-bold">Instealth</h1>
+            <h2 className="text-4xl">Privacy-first settlement protocol for e-invoices</h2>
+        </div>}
+        {/* {isModalOpen && createPortal(<div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
             <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                 <div className="mt-3 text-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">Transaction Status</h3>
@@ -366,6 +252,6 @@ export default function Invoices() {
                     )}
                 </div>
             </div>
-        </div>, document.body)}
+        </div>, document.body)} */}
     </div>
 }

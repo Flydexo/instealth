@@ -2,7 +2,6 @@ import { Tailwind, Button, Html, Heading, Body, Container } from "@react-email/c
 
 export enum InvoiceStatus {
     Sent = 'sent',
-    Received = 'received',
     Rejected = 'rejected',
     Paid = 'paid'
 }

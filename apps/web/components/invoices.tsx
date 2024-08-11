@@ -13,7 +13,7 @@ import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { createPortal } from "react-dom";
 import { gasManagerConfig } from "@/lib/config";
 import * as React from 'react';
-import { sendPaymentEmail, sendProofEmail, sendRejectInvoice } from "@/lib/actions";
+import { sendInvoiceEmail, sendPaymentEmail, sendProofEmail, sendRejectInvoice } from "@/lib/actions";
 import { generateKeysFromSignature, generateStealthAddress, generateStealthMetaAddressFromKeys } from "@scopelift/stealth-address-sdk";
 import { stealthAbi } from "@/lib/abis/stealth";
 import { Button } from "./ui/button";
@@ -153,10 +153,7 @@ export default function Invoices() {
         reset();
         const keys = generateKeysFromSignature(await signer!.signMessage(`Generate stealth address for chain base sepolia on instealth`));
         const stealthMeta = `st:basesep:${generateStealthMetaAddressFromKeys(keys)}`;
-        await fetch('/api/send', {
-            method: 'POST',
-            body: JSON.stringify({ from: user!.email, invoice: newInvoice, fromAddress: stealthMeta }),
-        });
+        await sendInvoiceEmail(newInvoice, user!.email!, stealthMeta);
         toast({ title: "Email sent", description: "Email sent!" });
         toast({ title: "Invoice created", description: <Link href={`https://base-sepolia.easscan.org/attestation/view/${uid}`} target="_blank" className="text-blue-500 hover:text-blue-800">View attestation</Link> });
         setIsLoading(false);

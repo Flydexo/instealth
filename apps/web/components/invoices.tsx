@@ -145,7 +145,7 @@ export default function Invoices() {
             email: data.email,
             status: InvoiceStatus.Sent,
             onchainInvoice: invoice,
-            file: await fileToBase64(data.pdf.item(0)!),
+            file: "",
             uid,
             fromAddress: undefined
         };
@@ -153,6 +153,7 @@ export default function Invoices() {
         reset();
         const keys = generateKeysFromSignature(await signer!.signMessage(`Generate stealth address for chain base sepolia on instealth`));
         const stealthMeta = `st:basesep:${generateStealthMetaAddressFromKeys(keys)}`;
+        console.log(user!.email, stealthMeta)
         await sendInvoiceEmail(newInvoice, user!.email!, stealthMeta);
         toast({ title: "Email sent", description: "Email sent!" });
         toast({ title: "Invoice created", description: <Link href={`https://base-sepolia.easscan.org/attestation/view/${uid}`} target="_blank" className="text-blue-500 hover:text-blue-800">View attestation</Link> });

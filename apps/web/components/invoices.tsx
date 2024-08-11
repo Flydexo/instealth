@@ -153,7 +153,6 @@ export default function Invoices() {
         reset();
         const keys = generateKeysFromSignature(await signer!.signMessage(`Generate stealth address for chain base sepolia on instealth`));
         const stealthMeta = `st:basesep:${generateStealthMetaAddressFromKeys(keys)}`;
-
         await fetch('/api/send', {
             method: 'POST',
             body: JSON.stringify({ from: user!.email, invoice: newInvoice, fromAddress: stealthMeta }),
